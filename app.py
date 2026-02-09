@@ -55,7 +55,7 @@ else:  # Describe Image
 st.write("### Goods and Services (Optional)")
 gs_desc = st.text_area(
     "Describe the goods and services for this trademark:",
-    placeholder="sell halal food online and in-store",
+    placeholder="Describe goods and services(e.g., sell sandwiches online and in-store)",
     help="This helps provide additional context for the trademark search.",
     height=80
 )
