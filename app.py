@@ -175,8 +175,8 @@ if st.button("Search Similar Marks"):
                                     with st.container():
                                         st.markdown("---")
                                         # Trademark image from USPTO
-                                        image_url = f"{IMAGE_DOWNLOAD_SVC_URL}/cases/{mark.get('serial_no')}/mark/image.png"
-                                        
+                                        image_url = f"{IMAGE_DOWNLOAD_SVC_URL}/img/{mark.get('serial_no')}/large"
+                                
                                         # Create a fixed height container for the image
                                         st.markdown(f"""
                                         <div style="height: 150px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
