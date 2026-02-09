@@ -175,7 +175,7 @@ if st.button("Search Similar Marks"):
                                     with st.container():
                                         st.markdown("---")
                                         # Trademark image from USPTO
-                                        image_url = f"{IMAGE_DOWNLOAD_SVC_URL}/img/{mark.get('serial_no')}/large"
+                                        image_url = f"{IMAGE_DOWNLOAD_SVC_URL}/{mark.get('serial_no')}/large"
                                 
                                         # Create a fixed height container for the image
                                         st.markdown(f"""
