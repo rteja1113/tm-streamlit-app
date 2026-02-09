@@ -13,7 +13,7 @@ API_KEY = os.getenv("API_KEY")
 st.set_page_config(page_title="Trademark Analysis", layout="wide")
 
 # Main content
-st.title("Visual Likelihood of Confusion")
+st.title("Trademark Similarity Search")
 
 # Legal disclaimer
 st.warning("⚠️ **Disclaimer**: This tool is for informational purposes only and does not constitute legal advice. For trademark matters, please consult with a qualified intellectual property attorney.")
