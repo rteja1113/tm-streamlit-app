@@ -11,23 +11,22 @@ IMAGE_DOWNLOAD_SVC_URL = os.getenv("IMAGE_DOWNLOAD_SVC")
 API_KEY = os.getenv("API_KEY")
 
 st.set_page_config(page_title="Trademark Analysis", layout="wide")
+# Legal disclaimer
+st.warning("⚠️ **Disclaimer**: This tool is for informational purposes only and does not constitute legal advice. For trademark matters, please consult with a qualified intellectual property attorney.")
 
 # Main content
 st.title("Trademark/Logo Similarity Search(USPTO Trademarks only)")
 
-# Legal disclaimer
-st.warning("⚠️ **Disclaimer**: This tool is for informational purposes only and does not constitute legal advice. For trademark matters, please consult with a qualified intellectual property attorney.")
-
 # Option selection
 search_type = st.radio(
-    "Choose search method:",
-    ["Upload Image", "Describe Image"]
+    "Trademark similiary by:",
+    ["Image (Upload Image)", "Image Description"]
 )
 
 cropped_img = None
 description_text = ""
 
-if search_type == "Upload Image":
+if search_type == "Image (Upload Image)":
     # File upload widget
     uploaded_file = st.file_uploader(
         "Upload an image file",
@@ -38,11 +37,15 @@ if search_type == "Upload Image":
         # Display and crop the image
         img = Image.open(uploaded_file)
         st.write("Crop your image:")
-        cropped_img = st_cropper(img, realtime_update=True, box_color='#FF0004')
-        
-        # Display cropped preview
-        st.write("Preview of cropped image:")
-        st.image(cropped_img, width=300)
+
+        col1, col2 = st.columns([1,1], gap="small")
+        with col1:
+            st.subheader("Original Image")
+            cropped_img = st_cropper(img, realtime_update=True, box_color='#FF0004')
+        with col2:
+            st.subheader("Selected Image Preview")
+            # The cropped image can be manipulated further with PIL if needed
+            st.image(cropped_img, caption="Search Selection")
 
 else:  # Describe Image
     description_text = st.text_area(
@@ -61,8 +64,8 @@ gs_desc = st.text_area(
 )
 
 # Search button
-if st.button("Search Similar Marks"):
-    if search_type == "Upload Image" and cropped_img is not None:
+if st.button("Search Similar Marks", type="primary"):
+    if search_type == "Image (Upload Image)" and cropped_img is not None:
         with st.spinner("Searching for similar marks..."):
             try:
                 # Convert cropped image to bytes for upload
@@ -93,11 +96,11 @@ if st.button("Search Similar Marks"):
                         all_design_codes = result.get("design_codes", [])
                         
                         # Create layout with main content and sidebar
-                        main_col, side_col = st.columns([3, 1])
+                        main_col, side_col = st.columns([3, 1], gap="large")
                         
                         with main_col:
                             # Create columns for cards layout
-                            cols = st.columns(3)  # 3 cards per row
+                            cols = st.columns([1,1,1], gap="medium")  # 3 cards per row
                             
                             for idx, mark in enumerate(result["similar_marks"]):
                                 col = cols[idx % 3]
@@ -110,7 +113,7 @@ if st.button("Search Similar Marks"):
                                     
                                         # Create a fixed height container for the image
                                         st.markdown(f"""
-                                        <div style="height: 150px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+                                        <div style="height: 150px; display: flex; align-items: center; justify-content: center; overflow: hidden;margin-bottom:10px;">
                                             <img src="{image_url}" style="max-width: 180px; max-height: 150px; object-fit: contain;" />
                                         </div>
                                         """, unsafe_allow_html=True)
@@ -137,7 +140,7 @@ if st.button("Search Similar Marks"):
             except Exception as e:
                 st.error(f"An error occurred: {str(e)}")
                     
-    elif search_type == "Describe Image" and description_text.strip():
+    elif search_type == "Image Description" and description_text.strip():
         with st.spinner("Searching for similar marks..."):
             try:
                 # Prepare the POST request for description with goods/services description
@@ -206,7 +209,7 @@ if st.button("Search Similar Marks"):
             except Exception as e:
                 st.error(f"An error occurred: {str(e)}")
     else:
-        if search_type == "Upload Image":
+        if search_type == "Image (Upload Image)":
             st.warning("Please upload an image file and crop it first.")
         else:
             st.warning("Please enter a description of the trademark image.")
