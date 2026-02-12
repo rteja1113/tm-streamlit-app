@@ -67,10 +67,12 @@ if page == "Logo Similarity":
     st.title("Trademark/Logo Similarity Search (USPTO Trademarks only)")
     
     # Option selection
+    st.subheader("Trademark Similarity By:")
     search_type = st.radio(
-        "Trademark Similarity By:",
+        "Select search method:",
         ["Image (Upload Image)", "Image Description"],
-        key="search_method_radio"
+        key="search_method_radio",
+        label_visibility="collapsed"
     )
 
     cropped_img = None
