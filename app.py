@@ -51,6 +51,8 @@ def download_csv_from_s3(s3_path):
 cc_analysis_df = download_csv_from_s3(CC_ANALYSIS_FILE_PATH) if CC_ANALYSIS_FILE_PATH else None
 
 st.set_page_config(page_title="Trademark Analysis", layout="wide")
+# Legal disclaimer
+st.warning("⚠️ **Disclaimer**: This tool is for informational purposes only and does not constitute legal advice. For trademark matters, please consult with a qualified intellectual property attorney.")
 
 # Sidebar navigation with selectbox
 st.sidebar.title("🔧 Navigation")
@@ -60,24 +62,21 @@ page = st.sidebar.selectbox(
     key="nav_selectbox"
 )
 
-# Legal disclaimer
-st.warning("⚠️ **Disclaimer**: This tool is for informational purposes only and does not constitute legal advice. For trademark matters, please consult with a qualified intellectual property attorney.")
-
 # ===== LOGO SIMILARITY PAGE =====
 if page == "Logo Similarity":
     st.title("Trademark/Logo Similarity Search (USPTO Trademarks only)")
     
     # Option selection
     search_type = st.radio(
-        "Choose search method:",
-        ["Upload Image", "Describe Image"],
+        "Trademark Similarity By:",
+        ["Image (Upload Image)", "Image Description"],
         key="search_method_radio"
     )
 
     cropped_img = None
     description_text = ""
 
-    if search_type == "Upload Image":
+    if search_type == "Image (Upload Image)":
         # File upload widget
         uploaded_file = st.file_uploader(
             "Upload an image file",
@@ -88,12 +87,18 @@ if page == "Logo Similarity":
         if uploaded_file is not None:
             # Display and crop the image
             img = Image.open(uploaded_file)
-            st.write("Crop your image:")
-            cropped_img = st_cropper(img, realtime_update=True, box_color='#FF0004')
             
-            # Display cropped preview
-            st.write("Preview of cropped image:")
-            st.image(cropped_img, width=300)
+            # Create two columns for cropper and preview
+            crop_col, preview_col = st.columns([2, 1])
+            
+            with crop_col:
+                st.write("### Original Image:")
+                cropped_img = st_cropper(img, realtime_update=True, box_color='#FF0004')
+            
+            with preview_col:
+                st.write("### Selected Image Preview")
+                if cropped_img is not None:
+                    st.image(cropped_img, use_container_width=True)
 
     else:  # Describe Image
         description_text = st.text_area(
@@ -115,7 +120,7 @@ if page == "Logo Similarity":
 
     # Search button
     if st.button("Search Similar Marks", key="search_button"):
-        if search_type == "Upload Image" and cropped_img is not None:
+        if search_type == "Image (Upload Image)" and cropped_img is not None:
             with st.spinner("Searching for similar marks..."):
                 try:
                     # Convert cropped image to bytes for upload
@@ -190,7 +195,7 @@ if page == "Logo Similarity":
                 except Exception as e:
                     st.error(f"An error occurred: {str(e)}")
                         
-        elif search_type == "Describe Image" and description_text.strip():
+        elif search_type == "Image Description" and description_text.strip():
             with st.spinner("Searching for similar marks..."):
                 try:
                     # Prepare the POST request for description with goods/services description
@@ -259,7 +264,7 @@ if page == "Logo Similarity":
                 except Exception as e:
                     st.error(f"An error occurred: {str(e)}")
         else:
-            if search_type == "Upload Image":
+            if search_type == "Image (Upload Image)":
                 st.warning("Please upload an image file and crop it first.")
             else:
                 st.warning("Please enter a description of the trademark image.")
@@ -270,7 +275,7 @@ elif page == "Coordinate Class Calculator":
     
     if cc_analysis_df is not None:
         st.write("### Class Co-occurrence Probability Heatmap")
-        st.write("This heatmap shows P(B|A): the probability that an applicant will file for Class B given it has filed for Class A")
+        st.write("This heatmap shows P(B|A): the probability that an applicant will file for Class B given it has filed for Class A for all pairs of classes. Use this to identify potential coordinated classes based on historical filing patterns.")
         
         # Pivot the dataframe to create a matrix for heatmap
         heatmap_data = cc_analysis_df.pivot(
