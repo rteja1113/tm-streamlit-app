@@ -277,7 +277,7 @@ elif page == "Coordinate Class Calculator":
     
     if cc_analysis_df is not None:
         st.write("### Class Co-occurrence Probability Heatmap")
-        st.write("This heatmap shows P(B|A): the probability that an applicant will file for Class B given it has filed for Class A for all pairs of classes. Use this to identify potential coordinated classes based on historical filing patterns.")
+        st.write("This heatmap shows P(B|A): Probability that an applicant will file for Class B given they have filed for Class A. For ex: P(25 | 10) would give the probability that an applicant who has filed for Class 10 will also file for Class 25. Use this to identify potential coordinated classes based on historical filing patterns.")
         
         # Pivot the dataframe to create a matrix for heatmap
         heatmap_data = cc_analysis_df.pivot(
