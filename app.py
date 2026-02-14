@@ -295,7 +295,8 @@ if page == "Logo Similarity":
                                 """, unsafe_allow_html=True)
                                 
                                 # Mark details
-                                st.write(f"**Serial No:** {mark.get('serial_no', 'N/A')}")
+                                serial_no = mark.get('serial_no', 'N/A')
+                                st.markdown(f"**Serial No:** [{serial_no}](https://tsdr.uspto.gov/#caseNumber={serial_no}&caseSearchType=US_APPLICATION&caseType=DEFAULT&searchType=statusSearch)")
                                 st.write(f"**Filing Date:** {mark.get('filing_dt', 'N/A')}")
                                 st.write(f"**Mark ID:** {mark.get('mark_id_char', 'N/A') or 'N/A'}")
                                 st.write(f"**Similarity Score:** {mark.get('similarity_score', 0):.4f}")
