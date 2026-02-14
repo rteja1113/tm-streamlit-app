@@ -66,6 +66,12 @@ page = st.sidebar.selectbox(
 if page == "Logo Similarity":
     st.title("Trademark/Logo Similarity Search (USPTO Trademarks only)")
     
+    # Initialize session state for search results
+    if 'search_results' not in st.session_state:
+        st.session_state.search_results = None
+    if 'search_type_used' not in st.session_state:
+        st.session_state.search_type_used = None
+    
     # Option selection
     st.subheader("Trademark Similarity By:")
     search_type = st.radio(
@@ -74,6 +80,11 @@ if page == "Logo Similarity":
         key="search_method_radio",
         label_visibility="collapsed"
     )
+    
+    # Clear results if search type changes
+    if st.session_state.search_type_used and st.session_state.search_type_used != search_type:
+        st.session_state.search_results = None
+        st.session_state.search_type_used = None
 
     cropped_img = None
     description_text = ""
@@ -145,54 +156,11 @@ if page == "Logo Similarity":
                     if response.status_code == 200:
                         st.success("Search completed successfully!")
                         result = response.json()
-                        
-                        if "similar_marks" in result and result["similar_marks"]:
-                            st.subheader(f"Found {len(result['similar_marks'])} similar marks")
-                            
-                            # Get design codes from response
-                            all_design_codes = result.get("design_codes", [])
-                            
-                            # Create layout with main content and sidebar
-                            main_col, side_col = st.columns([3, 1])
-                            
-                            with main_col:
-                                # Create columns for cards layout
-                                cols = st.columns(3)  # 3 cards per row
-                                
-                                for idx, mark in enumerate(result["similar_marks"]):
-                                    col = cols[idx % 3]
-                                    
-                                    with col:
-                                        with st.container():
-                                            st.markdown("---")
-                                            # Trademark image from USPTO
-                                            image_url = f"{IMAGE_DOWNLOAD_SVC_URL}/{mark.get('serial_no')}/large"
-                                        
-                                            # Create a fixed height container for the image
-                                            st.markdown(f"""
-                                            <div style="height: 150px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
-                                                <img src="{image_url}" style="max-width: 180px; max-height: 150px; object-fit: contain;" />
-                                            </div>
-                                            """, unsafe_allow_html=True)
-                                            
-                                            # Mark details
-                                            st.write(f"**Serial No:** {mark.get('serial_no', 'N/A')}")
-                                            st.write(f"**Filing Date:** {mark.get('filing_dt', 'N/A')}")
-                                            st.write(f"**Mark ID:** {mark.get('mark_id_char', 'N/A') or 'N/A'}")
-                                            st.write(f"**Similarity Score:** {mark.get('similarity_score', 0):.4f}")
-                            
-                            with side_col:
-                                st.subheader("Design Codes")
-                                if all_design_codes:
-                                    for code in sorted(all_design_codes):
-                                        st.write(f"• {code}")
-                                else:
-                                    st.write("No design codes found")
-                                        
-                        else:
-                            st.info("No similar marks found.")
+                        st.session_state.search_results = result
+                        st.session_state.search_type_used = "Image (Upload Image)"
                     else:
                         st.error(f"Error: {response.status_code}")
+                        st.session_state.search_results = None
                         
                 except Exception as e:
                     st.error(f"An error occurred: {str(e)}")
@@ -214,54 +182,11 @@ if page == "Logo Similarity":
                     if response.status_code == 200:
                         st.success("Search completed successfully!")
                         result = response.json()
-                        
-                        if "similar_marks" in result and result["similar_marks"]:
-                            st.subheader(f"Found {len(result['similar_marks'])} similar marks")
-                            
-                            # Get design codes from response
-                            all_design_codes = result.get("design_codes", [])
-                            
-                            # Create layout with main content and sidebar
-                            main_col, side_col = st.columns([3, 1])
-                            
-                            with main_col:
-                                # Create columns for cards layout
-                                cols = st.columns(3)  # 3 cards per row
-                                
-                                for idx, mark in enumerate(result["similar_marks"]):
-                                    col = cols[idx % 3]
-                                    
-                                    with col:
-                                        with st.container():
-                                            st.markdown("---")
-                                            # Trademark image from USPTO
-                                            image_url = f"{IMAGE_DOWNLOAD_SVC_URL}/{mark.get('serial_no')}/large"
-                                    
-                                            # Create a fixed height container for the image
-                                            st.markdown(f"""
-                                            <div style="height: 150px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
-                                                <img src="{image_url}" style="max-width: 180px; max-height: 150px; object-fit: contain;" />
-                                            </div>
-                                            """, unsafe_allow_html=True)
-                                            
-                                            # Mark details
-                                            st.write(f"**Serial No:** {mark.get('serial_no', 'N/A')}")
-                                            st.write(f"**Filing Date:** {mark.get('filing_dt', 'N/A')}")
-                                            st.write(f"**Mark ID:** {mark.get('mark_id_char', 'N/A') or 'N/A'}")
-                                            st.write(f"**Similarity Score:** {mark.get('similarity_score', 0):.4f}")
-                            
-                            with side_col:
-                                st.subheader("Design Codes")
-                                if all_design_codes:
-                                    for code in sorted(all_design_codes):
-                                        st.write(f"• {code}")
-                                else:
-                                    st.write("No design codes found")
-                                        
-                        else:
-                            st.info("No similar marks found.")
+                        st.session_state.search_results = result
+                        st.session_state.search_type_used = "Image Description"
                     else:
                         st.error(f"Error: {response.status_code} - {response.text}")
+                        st.session_state.search_results = None
                         
                 except Exception as e:
                     st.error(f"An error occurred: {str(e)}")
@@ -270,6 +195,114 @@ if page == "Logo Similarity":
                 st.warning("Please upload an image file and crop it first.")
             else:
                 st.warning("Please enter a description of the trademark image.")
+    
+    # Display results if they exist in session state (outside button block for dynamic filtering)
+    if st.session_state.search_results is not None:
+        result = st.session_state.search_results
+        
+        if "similar_marks" in result and result["similar_marks"]:
+            st.subheader(f"Found {len(result['similar_marks'])} similar marks")
+            
+            # Aggregate design codes from all similar marks and count occurrences
+            design_code_counts = {}
+            for mark in result["similar_marks"]:
+                mark_design_codes = mark.get("design_codes", [])
+                if mark_design_codes:
+                    for code in mark_design_codes:
+                        design_code_counts[code] = design_code_counts.get(code, 0) + 1
+            
+            # Sort design codes by count (descending)
+            sorted_design_codes = sorted(design_code_counts.items(), key=lambda x: x[1], reverse=True)
+            
+            # Create layout with main content and sidebar
+            main_col, side_col = st.columns([3, 1])
+            
+            with side_col:
+                st.subheader("Design Codes")
+                if sorted_design_codes:
+                    st.write("*Click to filter results*")
+                    
+                    # Add Select All checkbox
+                    checkbox_key_suffix = st.session_state.search_type_used.replace(" ", "_").replace("(", "").replace(")", "")
+                    select_all_key = f"select_all_{checkbox_key_suffix}"
+                    
+                    # Initialize select_all state if not exists
+                    if select_all_key not in st.session_state:
+                        st.session_state[select_all_key] = True
+                    
+                    select_all = st.checkbox(
+                        "**Select All / Deselect All**",
+                        value=st.session_state[select_all_key],
+                        key=select_all_key
+                    )
+                    
+                    st.write("---")
+                    
+                    # Create checkboxes for each design code
+                    selected_codes = []
+                    for code, count in sorted_design_codes:
+                        # Initialize individual checkbox state if not exists
+                        code_key = f"code_{code}_{checkbox_key_suffix}"
+                        if code_key not in st.session_state:
+                            st.session_state[code_key] = True
+                        
+                        # Sync with select_all if it just changed
+                        if select_all != st.session_state.get(f"{select_all_key}_prev", True):
+                            st.session_state[code_key] = select_all
+                        
+                        is_selected = st.checkbox(
+                            f"{code} ({count})",
+                            value=st.session_state[code_key],
+                            key=code_key
+                        )
+                        if is_selected:
+                            selected_codes.append(code)
+                    
+                    # Store the previous select_all state for next comparison
+                    st.session_state[f"{select_all_key}_prev"] = select_all
+                else:
+                    st.write("No design codes found")
+            
+            # Filter marks based on selected design codes
+            if selected_codes:
+                filtered_marks = [
+                    mark for mark in result["similar_marks"]
+                    if any(code in mark.get("design_codes", []) for code in selected_codes)
+                ]
+            else:
+                filtered_marks = []
+            
+            with main_col:
+                if filtered_marks:
+                    st.write(f"Showing {len(filtered_marks)} of {len(result['similar_marks'])} marks")
+                    # Create columns for cards layout
+                    cols = st.columns(3)  # 3 cards per row
+                    
+                    for idx, mark in enumerate(filtered_marks):
+                        col = cols[idx % 3]
+                        
+                        with col:
+                            with st.container():
+                                st.markdown("---")
+                                # Trademark image from USPTO
+                                image_url = f"{IMAGE_DOWNLOAD_SVC_URL}/{mark.get('serial_no')}/large"
+                            
+                                # Create a fixed height container for the image
+                                st.markdown(f"""
+                                <div style="height: 150px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+                                    <img src="{image_url}" style="max-width: 180px; max-height: 150px; object-fit: contain;" />
+                                </div>
+                                """, unsafe_allow_html=True)
+                                
+                                # Mark details
+                                st.write(f"**Serial No:** {mark.get('serial_no', 'N/A')}")
+                                st.write(f"**Filing Date:** {mark.get('filing_dt', 'N/A')}")
+                                st.write(f"**Mark ID:** {mark.get('mark_id_char', 'N/A') or 'N/A'}")
+                                st.write(f"**Similarity Score:** {mark.get('similarity_score', 0):.4f}")
+                else:
+                    st.info("No marks match the selected design codes. Please select at least one design code.")
+        else:
+            st.info("No similar marks found.")
 
 # ===== COORDINATE CLASS CALCULATOR PAGE =====
 elif page == "Coordinate Class Calculator":
