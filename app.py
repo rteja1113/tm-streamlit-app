@@ -13,6 +13,7 @@ SIMILARITY_SVC_URL = os.getenv("SIMILARITY_SEARCH_SVC")
 IMAGE_DOWNLOAD_SVC_URL = os.getenv("IMAGE_DOWNLOAD_SVC")
 API_KEY = os.getenv("API_KEY")
 CC_ANALYSIS_FILE_PATH = os.getenv("CC_ANALYSIS_FILE_PATH")
+DESIGN_CODE_DESC_PATH = os.getenv("DESIGN_CODE_DESC_PATH")
 
 # AWS credentials
 AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
@@ -49,6 +50,7 @@ def download_csv_from_s3(s3_path):
 
 # Load the CSV file
 cc_analysis_df = download_csv_from_s3(CC_ANALYSIS_FILE_PATH) if CC_ANALYSIS_FILE_PATH else None
+design_code_desc_df = download_csv_from_s3(DESIGN_CODE_DESC_PATH) if DESIGN_CODE_DESC_PATH else None
 
 st.set_page_config(page_title="Trademark Analysis", layout="wide")
 # Legal disclaimer
@@ -250,10 +252,18 @@ if page == "Logo Similarity":
                         if select_all != st.session_state.get(f"{select_all_key}_prev", True):
                             st.session_state[code_key] = select_all
                         
+                        # Get description for the design code
+                        help_text = None
+                        if design_code_desc_df is not None:
+                            desc_row = design_code_desc_df[design_code_desc_df['design_code'] == code]
+                            if not desc_row.empty:
+                                help_text = desc_row.iloc[0]['design_code_description']
+                        
                         is_selected = st.checkbox(
                             f"{code} ({count})",
                             value=st.session_state[code_key],
-                            key=code_key
+                            key=code_key,
+                            help=help_text
                         )
                         if is_selected:
                             selected_codes.append(code)
