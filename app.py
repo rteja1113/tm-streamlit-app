@@ -252,15 +252,20 @@ if page == "Logo Similarity":
                         if select_all != st.session_state.get(f"{select_all_key}_prev", True):
                             st.session_state[code_key] = select_all
                         
-                        # Get description for the design code
-                        help_text = None
+                        # Get description for the design code and truncate for display
+                        checkbox_label = f"{code} ({count})"
+                        help_text = code
                         if design_code_desc_df is not None:
                             desc_row = design_code_desc_df[design_code_desc_df['design_code'] == code]
                             if not desc_row.empty:
-                                help_text = desc_row.iloc[0]['design_code_description']
+                                description = desc_row.iloc[0]['design_code_description']
+                                # Truncate description to ~30 chars for label
+                                truncated_desc = description[:30] + "..." if len(description) > 30 else description
+                                checkbox_label = f"{truncated_desc} ({count})"
+                                help_text = f"{code}: {description}"
                         
                         is_selected = st.checkbox(
-                            f"{code} ({count})",
+                            checkbox_label,
                             value=st.session_state[code_key],
                             key=code_key,
                             help=help_text
