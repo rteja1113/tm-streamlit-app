@@ -60,7 +60,7 @@ st.warning("⚠️ **Disclaimer**: This tool is for informational purposes only 
 st.sidebar.title("🔧 Navigation")
 page = st.sidebar.selectbox(
     "Choose a tool:",
-    ["Logo Similarity", "Coordinate Class Calculator"],
+    ["Logo Similarity", "Word Mark Similarity", "Coordinate Class Calculator"],
     key="nav_selectbox"
 )
 
@@ -319,6 +319,136 @@ if page == "Logo Similarity":
                     st.info("No marks match the selected design codes. Please select at least one design code.")
         else:
             st.info("No similar marks found.")
+
+# ===== WORD MARK SIMILARITY PAGE =====
+elif page == "Word Mark Similarity":
+    st.title("Word Mark Similarity Search")
+    
+    # Initialize session state for search results
+    if 'word_mark_results' not in st.session_state:
+        st.session_state.word_mark_results = None
+    
+    # Input fields
+    st.subheader("Enter Search Parameters")
+    
+    query_word_mark = st.text_input(
+        "Query Word Mark:",
+        placeholder="Enter the word mark to search for (e.g., FASTBREAK)",
+        key="query_word_mark_input"
+    )
+    
+    gs_description = st.text_area(
+        "Goods and Services Description:",
+        placeholder="Describe the goods and services",
+        height=100,
+        key="gs_description_input"
+    )
+    
+    nice_class = st.text_input(
+        "NICE Class (Optional):",
+        placeholder="Enter NICE class number (e.g., 25)",
+        key="nice_class_input"
+    )
+    
+    # Search button
+    if st.button("Search", key="word_mark_search_button"):
+        if query_word_mark.strip() and gs_description.strip():
+            with st.spinner("Searching for similar word marks..."):
+                try:
+                    # Prepare request body
+                    body = {
+                        "word_mark": query_word_mark.strip(),
+                        "gs_description": gs_description.strip()
+                    }
+                    
+                    # Only include nice_class if provided
+                    if nice_class.strip():
+                        body["nice_class"] = nice_class.strip()
+                    
+                    # Make API call
+                    response = requests.post(
+                        f"{SIMILARITY_SVC_URL}/wmark-app/locCandidatesForWordMark",
+                        json=body
+                    )
+                    
+                    if response.status_code == 200:
+                        results = response.json()
+                        if results and len(results) > 0:
+                            st.success(f"Found {len(results)} similar word marks!")
+                            st.session_state.word_mark_results = results
+                        else:
+                            st.info("No similar word marks found.")
+                            st.session_state.word_mark_results = None
+                    else:
+                        st.error(f"Error: {response.status_code} - {response.text}")
+                        st.session_state.word_mark_results = None
+                        
+                except Exception as e:
+                    st.error(f"An error occurred: {str(e)}")
+                    st.session_state.word_mark_results = None
+        else:
+            st.warning("Please enter both Query Word Mark and Goods and Services Description.")
+    
+    # Display results if they exist
+    if st.session_state.word_mark_results is not None:
+        results = st.session_state.word_mark_results
+        
+        st.write("---")
+        st.subheader("Similarity Analysis")
+        
+        # Prepare data for scatter plot
+        df = pd.DataFrame(results)
+        
+        # Create hover text combining registration_no and mark_id_char
+        df['hover_text'] = df.apply(
+            lambda row: f"Registration No: {row['registration_no']}<br>Mark: {row['mark_id_char']}", 
+            axis=1
+        )
+        
+        # Create scatter plot
+        fig = px.scatter(
+            df,
+            x='good_services_similarity_score',
+            y='word_similarity_score',
+            hover_data={'hover_text': True, 
+                       'good_services_similarity_score': False, 
+                       'word_similarity_score': False,
+                       'registration_no': False,
+                       'mark_id_char': False},
+            labels={
+                'good_services_similarity_score': 'Goods & Services Similarity Score',
+                'word_similarity_score': 'Word Similarity Score'
+            },
+            title='Word Mark Similarity Analysis',
+            color='word_similarity_score',
+            color_continuous_scale='Viridis',
+            size_max=10
+        )
+        
+        # Update hover template to only show custom hover text
+        fig.update_traces(
+            hovertemplate='%{customdata[0]}<extra></extra>'
+        )
+        
+        # Update layout
+        fig.update_layout(
+            width=900,
+            height=600,
+            xaxis_title="Goods & Services Similarity Score",
+            yaxis_title="Word Similarity Score",
+            hovermode='closest'
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # Display data table
+        with st.expander("📊 View Detailed Results"):
+            display_df = df[['registration_no', 'mark_id_char', 'word_similarity_score', 'good_services_similarity_score']].copy()
+            display_df.columns = ['Registration No', 'Mark', 'Word Similarity Score', 'G&S Similarity Score']
+            display_df = display_df.sort_values('Word Similarity Score', ascending=False)
+            display_df.reset_index(drop=True, inplace=True)
+            display_df.index = display_df.index + 1
+            st.dataframe(display_df, use_container_width=True)
 
 # ===== COORDINATE CLASS CALCULATOR PAGE =====
 elif page == "Coordinate Class Calculator":
