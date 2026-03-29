@@ -443,13 +443,32 @@ elif page == "Word Mark Similarity":
         
         # Display data table
         with st.expander("📊 View Detailed Results"):
-            display_df = df[['registration_no', 'mark_id_char', 'word_similarity_score', 'good_services_similarity_score']].copy()
-            display_df.columns = ['Registration No', 'Mark', 'Word Similarity Score', 'G&S Similarity Score']
-            display_df = display_df.sort_values('Word Similarity Score', ascending=False)
-            display_df.reset_index(drop=True, inplace=True)
-            display_df.index = display_df.index + 1
-            st.dataframe(display_df, use_container_width=True)
-
+            # Get original serial_no values for display
+            serial_nos_display = df['serial_no'].astype(str)
+            
+            # Create dataframe
+            display_df = df[['serial_no', 'registration_no', 'mark_id_char', 'word_similarity_score', 'good_services_similarity_score']].copy()
+            
+            # Create URLs for Serial No
+            display_df['serial_no'] = serial_nos_display.apply(
+                lambda x: f"https://tsdr.uspto.gov/#caseNumber={x}&caseSearchType=US_APPLICATION&caseType=DEFAULT&searchType=statusSearch"
+            )
+            
+            # Rename columns
+            display_df.columns = ['Serial No', 'Registration No', 'Mark', 'Word Similarity Score', 'G&S Similarity Score']
+            
+            # Display with LinkColumn and st.dataframe native sorting/filtering
+            st.dataframe(
+                display_df,
+                column_config={
+                    "Serial No": st.column_config.LinkColumn(
+                        "Serial No",
+                        display_text=r"caseNumber=(\d+)"
+                    )
+                },
+                use_container_width=True
+            )
+            
 # ===== COORDINATE CLASS CALCULATOR PAGE =====
 elif page == "Coordinate Class Calculator":
     st.title("Coordinate Class Calculator")
