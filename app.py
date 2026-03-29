@@ -333,13 +333,13 @@ elif page == "Word Mark Similarity":
     
     query_word_mark = st.text_input(
         "Query Word Mark:",
-        placeholder="Enter the word mark to search for (e.g., FASTBREAK)",
+        placeholder="Enter the word mark to search for (e.g., GOOGLE)",
         key="query_word_mark_input"
     )
     
     gs_description = st.text_area(
         "Goods and Services Description:",
-        placeholder="Describe the goods and services",
+        placeholder="Describe the goods and services (eg. software for online search and advertising)",
         height=100,
         key="gs_description_input"
     )
