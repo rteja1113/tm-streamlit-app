@@ -8,6 +8,15 @@ import os
 import boto3
 import pandas as pd
 import plotly.express as px
+from reportlab.lib.pagesizes import letter, A4
+from reportlab.lib.units import inch
+from reportlab.pdfgen import canvas
+from reportlab.platypus import Table, TableStyle, Paragraph, Spacer, PageBreak, SimpleDocTemplate, Image as RLImage
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib import colors
+from reportlab.lib.enums import TA_CENTER, TA_LEFT
+from io import BytesIO
+import requests as req
 
 SIMILARITY_SVC_URL = os.getenv("SIMILARITY_SEARCH_SVC")
 IMAGE_DOWNLOAD_SVC_URL = os.getenv("IMAGE_DOWNLOAD_SVC")
@@ -47,6 +56,105 @@ def download_csv_from_s3(s3_path):
     obj = s3_client.get_object(Bucket=bucket, Key=key)
     df = pd.read_csv(io.BytesIO(obj['Body'].read()))
     return df
+
+# Function to generate PDF with cropped image and results table
+def generate_pdf_report(cropped_img, filtered_marks, search_type_used):
+    """Generate a PDF report with cropped image and table of candidates"""
+    pdf_buffer = BytesIO()
+    
+    try:
+        # Create PDF document
+        doc = SimpleDocTemplate(pdf_buffer, pagesize=letter, topMargin=0.5*inch, bottomMargin=0.5*inch)
+        elements = []
+        styles = getSampleStyleSheet()
+        
+        # Title style
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=16,
+            textColor=colors.HexColor('#1f78b4'),
+            spaceAfter=12,
+            alignment=TA_CENTER
+        )
+        
+        # Add title
+        title = Paragraph("Trademark/Logo Similarity Search Report", title_style)
+        elements.append(title)
+        elements.append(Spacer(1, 0.2*inch))
+        
+        # Add cropped image - convert PIL to BytesIO
+        elements.append(Paragraph("<b>Query Image (Cropped):</b>", styles['Heading2']))
+        cropped_buffer = BytesIO()
+        cropped_img.save(cropped_buffer, format='PNG')
+        cropped_buffer.seek(0)
+        img_for_pdf = RLImage(cropped_buffer, width=2*inch, height=2*inch)
+        elements.append(img_for_pdf)
+        elements.append(Spacer(1, 0.3*inch))
+        
+        # Add results section
+        if filtered_marks:
+            elements.append(Paragraph(f"<b>Found {len(filtered_marks)} Similar Marks:</b>", styles['Heading2']))
+            elements.append(Spacer(1, 0.2*inch))
+            
+            # Create table data
+            table_data = [['Serial No.', 'Trademark Image']]
+            
+            for mark in filtered_marks:
+                serial_no = str(mark.get('serial_no', 'N/A'))
+                image_url = f"{IMAGE_DOWNLOAD_SVC_URL}/{mark.get('serial_no')}/large"
+                
+                try:
+                    # Fetch image from URL with browser-like headers
+                    headers = {
+                        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                        'Accept': 'image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+                    }
+                    response = req.get(image_url, timeout=5, headers=headers)
+                    if response.status_code == 200:
+                        # Open image and resize it
+                        img = Image.open(BytesIO(response.content))
+                        img.thumbnail((200, 200), Image.Resampling.LANCZOS)  # Resize to max 200x200
+                        
+                        # Convert resized PIL image to BytesIO
+                        img_buffer = BytesIO()
+                        img.save(img_buffer, format='PNG')
+                        img_buffer.seek(0)
+                        
+                        # Create RLImage from BytesIO
+                        mark_img = RLImage(img_buffer, width=0.8*inch, height=0.8*inch)
+                        table_data.append([serial_no, mark_img])
+                    else:
+                        table_data.append([serial_no, f"[Error {response.status_code}]"])
+                except Exception as e:
+                    table_data.append([serial_no, "[Image unavailable]"])
+            
+            # Create table
+            table = Table(table_data, colWidths=[1.5*inch, 3*inch])
+            table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1f78b4')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('ROWHEIGHTS', (0, 0), (-1, -1), 1*inch),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ]))
+            
+            elements.append(table)
+        else:
+            elements.append(Paragraph("No results to display.", styles['Normal']))
+        
+        # Build PDF
+        doc.build(elements)
+        pdf_buffer.seek(0)
+        return pdf_buffer
+        
+    except Exception as e:
+        return BytesIO()
 
 # Load the CSV file
 cc_analysis_df = download_csv_from_s3(CC_ANALYSIS_FILE_PATH) if CC_ANALYSIS_FILE_PATH else None
@@ -290,6 +398,30 @@ if page == "Logo Similarity":
             with main_col:
                 if filtered_marks:
                     st.write(f"Showing {len(filtered_marks)} of {len(result['similar_marks'])} marks")
+                    
+                    # Initialize session state for PDF generation
+                    if 'pdf_report' not in st.session_state:
+                        st.session_state.pdf_report = None
+                    
+                    # Callback to generate PDF only when button is clicked
+                    def generate_and_store_pdf():
+                        st.session_state.pdf_report = generate_pdf_report(
+                            cropped_img, 
+                            filtered_marks, 
+                            st.session_state.search_type_used
+                        )
+                    
+                    # Add download PDF button with callback
+                    if cropped_img is not None:
+                        st.download_button(
+                            label="📥 Download Results as PDF",
+                            data=st.session_state.pdf_report if st.session_state.pdf_report else b"",
+                            file_name="trademark_similarity_results.pdf",
+                            mime="application/pdf",
+                            key="download_pdf_button",
+                            on_click=generate_and_store_pdf
+                        )
+                    
                     # Create columns for cards layout
                     cols = st.columns(3)  # 3 cards per row
                     
