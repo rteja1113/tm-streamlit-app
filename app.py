@@ -17,6 +17,8 @@ from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
 from io import BytesIO
 import requests as req
+import asyncio
+import aiohttp
 
 SIMILARITY_SVC_URL = os.getenv("SIMILARITY_SEARCH_SVC")
 IMAGE_DOWNLOAD_SVC_URL = os.getenv("IMAGE_DOWNLOAD_SVC")
@@ -56,6 +58,51 @@ def download_csv_from_s3(s3_path):
     obj = s3_client.get_object(Bucket=bucket, Key=key)
     df = pd.read_csv(io.BytesIO(obj['Body'].read()))
     return df
+
+# Async function to fetch a single image
+async def fetch_image_async(session, image_url, serial_no, headers):
+    """Fetch a single image asynchronously"""
+    try:
+        async with session.get(image_url, timeout=aiohttp.ClientTimeout(total=5), headers=headers) as response:
+            if response.status == 200:
+                content = await response.read()
+                # Open image and resize it
+                img = Image.open(BytesIO(content))
+                img.thumbnail((200, 200), Image.Resampling.LANCZOS)  # Resize to max 200x200
+                
+                # Convert resized PIL image to BytesIO
+                img_buffer = BytesIO()
+                img.save(img_buffer, format='PNG')
+                img_buffer.seek(0)
+                
+                # Create RLImage from BytesIO
+                mark_img = RLImage(img_buffer, width=0.8*inch, height=0.8*inch)
+                return (serial_no, mark_img)
+            else:
+                return (serial_no, f"[Error {response.status}]")
+    except asyncio.TimeoutError:
+        return (serial_no, "[Timeout]")
+    except Exception as e:
+        return (serial_no, "[Image unavailable]")
+
+# Async function to fetch all images concurrently
+async def fetch_all_images_async(filtered_marks):
+    """Fetch all images concurrently"""
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept': 'image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+    }
+    
+    async with aiohttp.ClientSession() as session:
+        tasks = []
+        for mark in filtered_marks:
+            serial_no = str(mark.get('serial_no', 'N/A'))
+            image_url = f"{IMAGE_DOWNLOAD_SVC_URL}/{mark.get('serial_no')}/large"
+            tasks.append(fetch_image_async(session, image_url, serial_no, headers))
+        
+        # Execute all tasks concurrently
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        return results
 
 # Function to generate PDF with cropped image and results table
 def generate_pdf_report(cropped_img, filtered_marks, search_type_used):
@@ -100,34 +147,12 @@ def generate_pdf_report(cropped_img, filtered_marks, search_type_used):
             # Create table data
             table_data = [['Serial No.', 'Trademark Image']]
             
-            for mark in filtered_marks:
-                serial_no = str(mark.get('serial_no', 'N/A'))
-                image_url = f"{IMAGE_DOWNLOAD_SVC_URL}/{mark.get('serial_no')}/large"
-                
-                try:
-                    # Fetch image from URL with browser-like headers
-                    headers = {
-                        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-                        'Accept': 'image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
-                    }
-                    response = req.get(image_url, timeout=5, headers=headers)
-                    if response.status_code == 200:
-                        # Open image and resize it
-                        img = Image.open(BytesIO(response.content))
-                        img.thumbnail((200, 200), Image.Resampling.LANCZOS)  # Resize to max 200x200
-                        
-                        # Convert resized PIL image to BytesIO
-                        img_buffer = BytesIO()
-                        img.save(img_buffer, format='PNG')
-                        img_buffer.seek(0)
-                        
-                        # Create RLImage from BytesIO
-                        mark_img = RLImage(img_buffer, width=0.8*inch, height=0.8*inch)
-                        table_data.append([serial_no, mark_img])
-                    else:
-                        table_data.append([serial_no, f"[Error {response.status_code}]"])
-                except Exception as e:
-                    table_data.append([serial_no, "[Image unavailable]"])
+            # Fetch all images concurrently using async
+            image_results = asyncio.run(fetch_all_images_async(filtered_marks))
+            
+            # Process results and add to table
+            for serial_no, mark_img in image_results:
+                table_data.append([serial_no, mark_img])
             
             # Create table
             table = Table(table_data, colWidths=[1.5*inch, 3*inch])
@@ -156,7 +181,7 @@ def generate_pdf_report(cropped_img, filtered_marks, search_type_used):
     except Exception as e:
         return BytesIO()
 
-# Load the CSV file
+
 cc_analysis_df = download_csv_from_s3(CC_ANALYSIS_FILE_PATH) if CC_ANALYSIS_FILE_PATH else None
 design_code_desc_df = download_csv_from_s3(DESIGN_CODE_DESC_PATH) if DESIGN_CODE_DESC_PATH else None
 
@@ -399,27 +424,30 @@ if page == "Logo Similarity":
                 if filtered_marks:
                     st.write(f"Showing {len(filtered_marks)} of {len(result['similar_marks'])} marks")
                     
-                    # Initialize session state for PDF generation
-                    if 'pdf_report' not in st.session_state:
-                        st.session_state.pdf_report = None
+                    # Cache PDF generation by tracking filtered marks
+                    if 'cached_pdf_marks' not in st.session_state:
+                        st.session_state.cached_pdf_marks = None
+                        st.session_state.cached_pdf_data = None
                     
-                    # Callback to generate PDF only when button is clicked
-                    def generate_and_store_pdf():
-                        st.session_state.pdf_report = generate_pdf_report(
-                            cropped_img, 
-                            filtered_marks, 
-                            st.session_state.search_type_used
-                        )
+                    # Get hashable representation of current filtered marks
+                    current_marks_hash = tuple(mark.get('serial_no') for mark in filtered_marks)
                     
-                    # Add download PDF button with callback
+                    # Generate PDF only if filtered marks have changed
                     if cropped_img is not None:
+                        if st.session_state.cached_pdf_marks != current_marks_hash:
+                            st.session_state.cached_pdf_data = generate_pdf_report(
+                                cropped_img, 
+                                filtered_marks, 
+                                st.session_state.search_type_used
+                            )
+                            st.session_state.cached_pdf_marks = current_marks_hash
+                        
                         st.download_button(
                             label="📥 Download Results as PDF",
-                            data=st.session_state.pdf_report if st.session_state.pdf_report else b"",
+                            data=st.session_state.cached_pdf_data,
                             file_name="trademark_similarity_results.pdf",
                             mime="application/pdf",
-                            key="download_pdf_button",
-                            on_click=generate_and_store_pdf
+                            key="download_pdf_button"
                         )
                     
                     # Create columns for cards layout
