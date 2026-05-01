@@ -223,6 +223,7 @@ if page == "Logo Similarity":
 
     cropped_img = None
     description_text = ""
+    gs_desc = ""  # Initialize for use in both search types
 
     if search_type == "Image (Upload Image)":
         # File upload widget
@@ -255,16 +256,16 @@ if page == "Logo Similarity":
             height=100,
             key="description_text_area"
         )
-
-    # Goods and services description input (optional)
-    st.write("### Goods and Services (Optional)")
-    gs_desc = st.text_area(
-        "Describe the goods and services for this trademark:",
-        placeholder="Describe goods and services(e.g., sell sandwiches online and in-store)",
-        help="This helps provide additional context for the trademark search.",
-        height=80,
-        key="gs_desc_text_area"
-    )
+        
+        # Goods and services description input (optional) - only for description search
+        st.write("### Goods and Services (Optional)")
+        gs_desc = st.text_area(
+            "Describe the goods and services for this trademark:",
+            placeholder="Describe goods and services(e.g., sell sandwiches online and in-store)",
+            help="This helps provide additional context for the trademark search.",
+            height=80,
+            key="gs_desc_text_area"
+        )
 
     # Similarity type selector (only for image-based search)
     similarity_type = None
