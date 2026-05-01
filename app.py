@@ -268,33 +268,36 @@ if page == "Logo Similarity":
         )
 
     # Similarity type selector (only for image-based search)
-    similarity_type = None
     if search_type == "Image (Upload Image)":
-        st.write("### Similarity Search Type")
-        similarity_type = st.radio(
-            "Select similarity type:",
-            ["shape_similarity", "concept_similarity"],
-            captions=["Compare based on visual shape and structure", "Compare based on conceptual meaning"],
-            key="similarity_type_radio",
-            label_visibility="collapsed"
-        )
-
-    # Search button
-    if st.button("Search Similar Marks", key="search_button"):
-        if search_type == "Image (Upload Image)" and cropped_img is not None:
-            with st.spinner("Searching for similar marks..."):
+        st.write("### Search Type")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            shape_search_button = st.button(
+                "🔷 Shape Similarity Search",
+                key="shape_similarity_button",
+                use_container_width=True
+            )
+        
+        with col2:
+            concept_search_button = st.button(
+                "💡 Concept Similarity Search",
+                key="concept_similarity_button",
+                use_container_width=True
+            )
+        
+        # Handle shape similarity search
+        if shape_search_button and cropped_img is not None:
+            with st.spinner("Searching for similar marks by shape..."):
                 try:
                     # Convert cropped image to bytes for upload
                     img_byte_arr = io.BytesIO()
                     cropped_img.save(img_byte_arr, format='PNG')    
                     img_byte_arr.seek(0)
                     
-                    # Prepare the POST request - send as file upload with goods/services description
+                    # Prepare the POST request
                     files = {"image": ("cropped_image.png", img_byte_arr, "image/png")}
-                    # files = {"image": ("cropped_image.png", img_byte_arr.getvalue(), "image/png")}
-                    data = {"gs_desc": gs_desc.strip()} if gs_desc.strip() else {}
-                    if similarity_type:
-                        data["similarity_type"] = similarity_type
+                    data = {"similarity_type": "shape_similarity"}
                     headers = {"x-api-key": API_KEY} if API_KEY else {}
                     response = requests.post(
                         f"{SIMILARITY_SVC_URL}/similarMarksByImage",
@@ -314,17 +317,26 @@ if page == "Logo Similarity":
                         
                 except Exception as e:
                     st.error(f"An error occurred: {str(e)}")
-                        
-        elif search_type == "Image Description" and description_text.strip():
-            with st.spinner("Searching for similar marks..."):
+        
+        elif shape_search_button and cropped_img is None:
+            st.warning("Please upload an image file and crop it first.")
+        
+        # Handle concept similarity search
+        if concept_search_button and cropped_img is not None:
+            with st.spinner("Searching for similar marks by concept..."):
                 try:
-                    # Prepare the POST request for description with goods/services description
-                    data = {"description": description_text.strip()}
-                    if gs_desc.strip():
-                        data["gs_desc"] = gs_desc.strip()
+                    # Convert cropped image to bytes for upload
+                    img_byte_arr = io.BytesIO()
+                    cropped_img.save(img_byte_arr, format='PNG')    
+                    img_byte_arr.seek(0)
+                    
+                    # Prepare the POST request
+                    files = {"image": ("cropped_image.png", img_byte_arr, "image/png")}
+                    data = {"similarity_type": "concept_similarity"}
                     headers = {"x-api-key": API_KEY} if API_KEY else {}
                     response = requests.post(
-                        f"{SIMILARITY_SVC_URL}/similarMarksByDescription",
+                        f"{SIMILARITY_SVC_URL}/similarMarksByImage",
+                        files=files,
                         data=data,
                         headers=headers
                     )
@@ -333,18 +345,48 @@ if page == "Logo Similarity":
                         st.success("Search completed successfully!")
                         result = response.json()
                         st.session_state.search_results = result
-                        st.session_state.search_type_used = "Image Description"
+                        st.session_state.search_type_used = "Image (Upload Image)"
                     else:
-                        st.error(f"Error: {response.status_code} - {response.text}")
+                        st.error(f"Error: {response.status_code}")
                         st.session_state.search_results = None
                         
                 except Exception as e:
                     st.error(f"An error occurred: {str(e)}")
-        else:
-            if search_type == "Image (Upload Image)":
-                st.warning("Please upload an image file and crop it first.")
+        
+        elif concept_search_button and cropped_img is None:
+            st.warning("Please upload an image file and crop it first.")
+
+    # Search button for description-based search
+    elif search_type == "Image Description":
+        if st.button("Search Similar Marks", key="search_button"):
+            if description_text.strip():
+                with st.spinner("Searching for similar marks..."):
+                    try:
+                        # Prepare the POST request for description with goods/services description
+                        data = {"description": description_text.strip()}
+                        if gs_desc.strip():
+                            data["gs_desc"] = gs_desc.strip()
+                        headers = {"x-api-key": API_KEY} if API_KEY else {}
+                        response = requests.post(
+                            f"{SIMILARITY_SVC_URL}/similarMarksByDescription",
+                            data=data,
+                            headers=headers
+                        )
+                        
+                        if response.status_code == 200:
+                            st.success("Search completed successfully!")
+                            result = response.json()
+                            st.session_state.search_results = result
+                            st.session_state.search_type_used = "Image Description"
+                        else:
+                            st.error(f"Error: {response.status_code} - {response.text}")
+                            st.session_state.search_results = None
+                            
+                    except Exception as e:
+                        st.error(f"An error occurred: {str(e)}")
             else:
                 st.warning("Please enter a description of the trademark image.")
+    
     
     # Display results if they exist in session state (outside button block for dynamic filtering)
     if st.session_state.search_results is not None:
