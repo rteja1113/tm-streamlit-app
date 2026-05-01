@@ -266,6 +266,18 @@ if page == "Logo Similarity":
         key="gs_desc_text_area"
     )
 
+    # Similarity type selector (only for image-based search)
+    similarity_type = None
+    if search_type == "Image (Upload Image)":
+        st.write("### Similarity Search Type")
+        similarity_type = st.radio(
+            "Select similarity type:",
+            ["shape_similarity", "concept_similarity"],
+            captions=["Compare based on visual shape and structure", "Compare based on conceptual meaning"],
+            key="similarity_type_radio",
+            label_visibility="collapsed"
+        )
+
     # Search button
     if st.button("Search Similar Marks", key="search_button"):
         if search_type == "Image (Upload Image)" and cropped_img is not None:
@@ -280,6 +292,8 @@ if page == "Logo Similarity":
                     files = {"image": ("cropped_image.png", img_byte_arr, "image/png")}
                     # files = {"image": ("cropped_image.png", img_byte_arr.getvalue(), "image/png")}
                     data = {"gs_desc": gs_desc.strip()} if gs_desc.strip() else {}
+                    if similarity_type:
+                        data["similarity_type"] = similarity_type
                     headers = {"x-api-key": API_KEY} if API_KEY else {}
                     response = requests.post(
                         f"{SIMILARITY_SVC_URL}/similarMarksByImage",
